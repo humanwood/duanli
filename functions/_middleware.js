@@ -2,7 +2,7 @@
 export const onRequest = async (context) => {
   // 配置鉴权账号密码【修改这里即可】
   const AUTH_USER = "admin";
-  const AUTH_PASS = "your_secret_password";
+  const AUTH_PASS = "duanli2027shangshi.";
 
   // 从请求头获取前端传入的授权信息
   const credentials = context.request.headers.get("Authorization");
