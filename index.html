@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>盲盒收益计算器 V3.7</title>
+    <style>
+        :root {
+            --bg: #050505;
+            --card-bg: #141414;
+            --primary: #00f2ea;
+            --gold: #ffd700;
+            --fuel: #ff3b30;
+            --team: #bf5af2;
+            --text-main: #ffffff;
+            --text-sub: #888888;
+            --border: rgba(255,255,255,0.1);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", Roboto, sans-serif; }
+        
+        body { background-color: var(--bg); color: var(--text-main); padding: 15px; max-width: 600px; margin: 0 auto; min-height: 100vh; padding-bottom: 90px; }
+
+        header { text-align: center; margin-bottom: 20px; padding: 15px 0; border-bottom: 1px solid var(--border); }
+        header h1 { font-size: 20px; font-weight: 800; background: linear-gradient(90deg, #fff, var(--primary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        header p { font-size: 11px; color: var(--text-sub); margin-top: 5px; }
+
+        /* 选项卡 */
+        .tabs { display: flex; background: #222; border-radius: 8px; padding: 4px; margin-bottom: 15px; }
+        .tab-btn { flex: 1; text-align: center; padding: 10px; font-size: 13px; color: #666; cursor: pointer; border-radius: 6px; transition: 0.3s; font-weight: bold; }
+        .tab-btn.active { background: var(--card-bg); color: var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+        .tab-btn.active.team { color: var(--team); }
+
+        .panel { display: none; }
+        .panel.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 卡片容器 */
+        .card { background: var(--card-bg); border-radius: 12px; padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); position: relative; }
+        .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .card-title { font-size: 13px; font-weight: bold; color: var(--primary); display: flex; align-items: center; gap: 5px; }
+        .card-title.team { color: var(--team); }
+
+        /* 输入控件 */
+        .input-group { margin-bottom: 15px; }
+        .label-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-sub); margin-bottom: 6px; }
+        .input-wrap { position: relative; }
+        input[type="number"] { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 12px; border-radius: 6px; font-size: 16px; font-weight: bold; outline: none; transition: border-color 0.3s; }
+        input[type="number"]:focus { border-color: var(--primary); }
+        .unit { position: absolute; right: 12px; top: 14px; font-size: 12px; color: #666; }
+        
+        #team input[type="number"]:focus { border-color: var(--team); }
+
+        input[type=range] { width: 100%; -webkit-appearance: none; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: var(--primary); margin-top: -6px; box-shadow: 0 0 10px rgba(0,242,234,0.3); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: #333; border-radius: 2px; }
+        
+        /* 波比调节滑块颜色 */
+        #p_reward_rate::-webkit-slider-thumb { background: var(--gold); box-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
+        
+        /* 团队滑块颜色 */
+        #t_invite::-webkit-slider-thumb { background: var(--team); box-shadow: 0 0 10px rgba(191,90,242,0.5); }
+
+        /* 结果展示 */
+        .income-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+        .income-box { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; text-align: center; }
+        .income-val { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+        .income-lbl { font-size: 10px; color: #888; }
+        .val-cash { color: var(--primary); }
+        .val-point { color: var(--gold); }
+
+        /* 账单条目 */
+        .bill-row { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px dashed #222; }
+        .bill-row:last-child { border: none; margin: 0; padding: 0; }
+        .bill-key { color: #888; }
+        .bill-val { font-weight: bold; }
+        .bill-val.green { color: var(--primary); }
+        .bill-val.red { color: var(--fuel); }
+        .bill-val.gold { color: var(--gold); }
+        .bill-val.team { color: var(--team); }
+
+        /* 代理提示框 */
+        .agent-hint {
+            display: none;
+            background: rgba(191, 90, 242, 0.15);
+            border: 1px solid rgba(191, 90, 242, 0.4);
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 15px;
+            font-size: 11px;
+            color: #e0e0e0;
+            line-height: 1.5;
+            cursor: pointer;
+            animation: pulse 2s infinite;
+        }
+        .agent-hint strong { color: var(--team); font-weight: bold; }
+        .agent-hint::after { content: " →"; }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(191, 90, 242, 0.2); }
+            70% { box-shadow: 0 0 0 6px rgba(191, 90, 242, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(191, 90, 242, 0); }
+        }
+
+        /* 状态栏 */
+        .status-bar { background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: 6px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 10px; }
+        .status-item { display: flex; align-items: center; gap: 4px; color: #666; }
+        .dot { width: 6px; height: 6px; border-radius: 50%; background: #444; }
+        .dot.ok { background: var(--primary); box-shadow: 0 0 5px var(--primary); }
+        .status-item.ok { color: var(--primary); }
+
+        /* 底部汇总 */
+        .footer { position: fixed; bottom: 0; left: 0; right: 0; background: #111; border-top: 1px solid #333; padding: 12px 20px; max-width: 600px; margin: 0 auto; z-index: 100; display: flex; justify-content: space-between; align-items: center; }
+        .foot-total span { display: block; font-size: 10px; color: #666; }
+        .foot-total b { font-size: 22px; color: #fff; }
+        .foot-roi { background: rgba(0,242,234,0.15); color: var(--primary); padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>盲盒收益计算器 V3.7</h1>
+    <p>波比灵活可调 · 适应市场变化</p>
+</header>
+
+<div class="tabs">
+    <div class="tab-btn active" id="tab_p" onclick="switchTab('personal', this)">👤 个人收益</div>
+    <div class="tab-btn" id="tab_t" onclick="switchTab('team', this)">🚀 团队代理</div>
+</div>
+
+<div id="personal" class="panel active">
+    
+    <div class="card">
+        <div class="card-head"><span class="card-title">⚙️ 投资参数</span></div>
+        <div class="input-group">
+            <div class="label-row"><span>单次投入本金</span> <span>1000 起投，1000倍数</span></div>
+            <div class="input-wrap">
+                <input type="number" id="p_principal" value="10000" min="1000" step="1000" oninput="calc()">
+                <span class="unit">元</span>
+            </div>
+        </div>
+        
+        <div class="input-group">
+            <div class="label-row">
+                <span>返利波比 (市场动态调整)</span> 
+                <span id="reward_rate_txt" style="color:var(--gold)">3.0%</span>
+            </div>
+            <input type="range" id="p_reward_rate" min="2.0" max="3.0" step="0.1" value="3.0" oninput="calc()">
+            <div class="label-row" style="margin-top:5px;">
+                <span style="font-size:9px; color:#666;">*拆解: 70%现金 + 30%积分</span>
+                <span id="split_detail" style="font-size:9px; color:#888;">现金2.1% | 积分0.9%</span>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <div class="label-row"><span>投资时长 (48小时/轮)</span> <span id="p_time_txt" style="color:var(--primary)">6个月</span></div>
+            <input type="range" id="p_time" min="1" max="12" value="6" step="1" oninput="calc()">
+        </div>
+        <div class="input-group" style="display:flex; justify-content:space-between; align-items:center; border-top:1px dashed #333; padding-top:10px;">
+            <span style="font-size:12px; color:#aaa;">开启复利 (现金利润滚入本金)</span>
+            <input type="checkbox" id="p_compound" checked onchange="calc()" style="width:18px; height:18px;">
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-head">
+            <span class="card-title">📉 提现费率 & 直推</span>
+            <span id="fee_display" style="font-size:11px; background:#333; padding:2px 6px; border-radius:4px;">15%</span>
+        </div>
+        <div class="input-group">
+            <div class="label-row"><span>直推好友人数 (同步团队数据)</span> <span id="invite_txt" style="color:var(--primary)">0 人</span></div>
+            <input type="range" id="invite" min="0" max="1000" value="0" step="1" oninput="syncInvite(this.value)">
+            <p style="font-size:10px; color:#666; margin-top:5px;">*拉满4人费率降至3%</p>
+        </div>
+
+        <div id="agent_hint" class="agent-hint" onclick="switchTab('team', document.getElementById('tab_t'))">
+            🎉 <strong>恭喜！直推已达标</strong><br>
+            您可能已触发【V1团队代理】资格，点击此处前往查看团队管道收益！
+        </div>
+    </div>
+
+    <div class="income-grid">
+        <div class="income-box">
+            <div class="income-val val-cash" id="res_net_cash">0</div>
+            <div class="income-lbl">现金净利润 (税后)</div>
+        </div>
+        <div class="income-box">
+            <div class="income-val val-point" id="res_points">0</div>
+            <div class="income-lbl">购物积分价值 (0.9%)</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-head"><span class="card-title">🧾 收益构成明细</span></div>
+        <div class="bill-row">
+            <span class="bill-key">💰 现金总产出 (本金×<span id="bill_rate_cash">2.1%</span>)</span>
+            <span class="bill-val green" id="bill_gross_cash">+0</span>
+        </div>
+        <div class="bill-row">
+            <span class="bill-key">🎁 积分总产出 (本金×<span id="bill_rate_point">0.9%</span>)</span>
+            <span class="bill-val gold" id="bill_gross_point">+0</span>
+        </div>
+        <div class="bill-row">
+            <span class="bill-key">🔥 燃料费消耗 (本金×0.5%)</span>
+            <span class="bill-val red" id="bill_fuel">-0</span>
+        </div>
+        <div class="bill-row">
+            <span class="bill-key">🏦 提现手续费 (仅扣现金部分)</span>
+            <span class="bill-val red" id="bill_tax">-0</span>
+        </div>
+        <div class="bill-row" style="margin-top:5px; border-top:1px solid #333; padding-top:5px;">
+            <span class="bill-key" style="color:#fff;">📊 实际净赚价值</span>
+            <span class="bill-val" style="color:#fff;" id="bill_total_net">+0</span>
+        </div>
+    </div>
+</div>
+
+<div id="team" class="panel">
+    <div class="card" style="border-color: rgba(191,90,242,0.3);">
+        <div class="card-head">
+            <span class="card-title team">💎 团队管道收益</span>
+            <span id="t_level_badge" style="background:#333; font-size:10px; padding:2px 6px; border-radius:4px; color:#888;">V0</span>
+        </div>
+        
+        <div class="input-group">
+            <div class="label-row"><span>直推人数 (同步个人数据)</span> <span id="t_invite_txt" style="color:var(--team)">0 人</span></div>
+            <input type="range" id="t_invite" min="0" max="1000" value="0" step="1" oninput="syncInvite(this.value)">
+        </div>
+
+        <div class="input-group">
+            <div class="label-row"><span>直推好友人均投入 (自动算流水)</span> <span>可调整</span></div>
+            <div class="input-wrap">
+                <input type="number" id="t_avg_invest" value="10000" oninput="autoCalcVol()">
+                <span class="unit">元/人</span>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <div class="label-row"><span>直推总流水/轮 (自动计算)</span> <span>0.45% 奖励</span></div>
+            <div class="input-wrap">
+                <input type="number" id="t_direct_vol" value="0" placeholder="0" oninput="calc()">
+                <span class="unit">元</span>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <div class="label-row"><span>团队总流水/轮 (含直推)</span> <span>V1需≥10万</span></div>
+            <div class="input-wrap">
+                <input type="number" id="t_team_vol" value="0" placeholder="0" oninput="calc()">
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <span style="color:#888;">升级 V1 条件:</span>
+            <div class="status-item" id="check_people">
+                <div class="dot"></div> 直推≥5人
+            </div>
+            <div class="status-item" id="check_vol">
+                <div class="dot"></div> 流水≥10万
+            </div>
+        </div>
+
+        <div id="peer_box" style="display:none; border-top:1px dashed #333; padding-top:10px; margin-top:10px;">
+            <div class="label-row"><span>平级下属总收入</span> <span>10% 伯乐奖</span></div>
+            <div class="input-wrap">
+                <input type="number" id="t_peer_income" value="0" placeholder="0" oninput="calc()">
+            </div>
+        </div>
+
+        <div class="bill-row" style="margin-top:15px;">
+            <span class="bill-key">直推流水奖 (持续累积)</span>
+            <span class="bill-val team" id="res_direct_award">+0</span>
+        </div>
+        <div class="bill-row">
+            <span class="bill-key">团队级差奖 (需达标)</span>
+            <span class="bill-val team" id="res_team_award">+0</span>
+        </div>
+    </div>
+</div>
+
+<div class="footer">
+    <div class="foot-total">
+        <span>资产总价值 (现金+积分+团队)</span>
+        <b id="final_asset">¥ 0</b>
+    </div>
+    <div class="foot-roi" id="final_roi">ROI: 0%</div>
+</div>
+
+<script>
+    const CONFIG = {
+        cycle: 15,            
+        fuelRatio: 0.005,     
+        directRatio: 0.0045,
+        minUnit: 1000 
+    };
+
+    const LEVELS = [
+        { n:'V0', r:0, d:0 },
+        { n:'V1', r:0.0015, d:5 },
+        { n:'V2', r:0.0030, d:6 },
+        { n:'V3', r:0.0045, d:7 },
+        { n:'V4', r:0.0055, d:8 },
+        { n:'V5', r:0.0065, d:9 }
+    ];
+
+    const $ = id => document.getElementById(id);
+    const fmt = n => Math.floor(n).toLocaleString();
+
+    function switchTab(mode, el) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        el.classList.add('active');
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        $(mode).classList.add('active');
+    }
+
+    function syncInvite(val) {
+        let v = parseInt(val);
+        $('t_invite').value = v;
+        $('invite').value = v; 
+        autoCalcVol();
+    }
+
+    function autoCalcVol() {
+        let invites = parseInt($('invite').value) || 0;
+        let avgInvest = parseFloat($('t_avg_invest').value) || 0;
+        $('t_direct_vol').value = invites * avgInvest;
+        let teamVol = parseFloat($('t_team_vol').value) || 0;
+        if (teamVol < (invites * avgInvest)) {
+            $('t_team_vol').value = invites * avgInvest;
+        }
+        calc();
+    }
+
+    function calc() {
+        // --- 1. 获取输入 ---
+        let principal = parseFloat($('p_principal').value) || 0;
+        let months = parseInt($('p_time').value);
+        let invites = parseInt($('invite').value);
+        let isCompound = $('p_compound').checked;
+        let rounds = months * CONFIG.cycle;
+
+        // --- 新增：波比动态计算 ---
+        let totalRewardRate = parseFloat($('p_reward_rate').value) / 100; // e.g., 0.025
+        $('reward_rate_txt').innerText = (totalRewardRate * 100).toFixed(1) + "%";
+        
+        let cashRatio = totalRewardRate * 0.70;
+        let pointRatio = totalRewardRate * 0.30;
+        
+        // 更新UI上的拆解说明
+        $('split_detail').innerText = `现金${(cashRatio*100).toFixed(2)}% | 积分${(pointRatio*100).toFixed(2)}%`;
+        $('bill_rate_cash').innerText = (cashRatio*100).toFixed(2) + "%";
+        $('bill_rate_point').innerText = (pointRatio*100).toFixed(2) + "%";
+
+        // UI 文本更新
+        $('p_time_txt').innerText = months + " 个月";
+        $('invite_txt').innerText = invites + " 人";
+        $('t_invite_txt').innerText = invites + " 人";
+
+        if (invites >= 5) {
+            $('agent_hint').style.display = 'block';
+        } else {
+            $('agent_hint').style.display = 'none';
+        }
+
+        // --- 2. 个人费率计算 ---
+        let feeUserCount = invites > 4 ? 4 : invites;
+        let taxRate = 0.15 - (feeUserCount * 0.03);
+        if(taxRate < 0.03) taxRate = 0.03;
+        
+        $('fee_display').innerText = `费率: ${(taxRate*100).toFixed(0)}%`;
+        $('fee_display').style.color = taxRate === 0.03 ? '#00f2ea' : '#fff';
+
+        // --- 3. 个人收益计算 (使用动态Ratio) ---
+        let balance = principal;
+        let totalCashGross = 0;
+        let totalFuelPaid = 0;
+        let totalPoints = 0;
+
+        for(let i=0; i<rounds; i++) {
+            let effectivePrincipal = 0;
+            if (isCompound) {
+                effectivePrincipal = Math.floor(balance / CONFIG.minUnit) * CONFIG.minUnit;
+            } else {
+                effectivePrincipal = Math.floor(principal / CONFIG.minUnit) * CONFIG.minUnit;
+            }
+
+            if (effectivePrincipal < CONFIG.minUnit) effectivePrincipal = 0;
+
+            let roundCash = effectivePrincipal * cashRatio;   // 动态
+            let roundPoint = effectivePrincipal * pointRatio; // 动态
+            let roundFuel = effectivePrincipal * CONFIG.fuelRatio;
+
+            totalCashGross += roundCash;
+            totalPoints += roundPoint;
+            totalFuelPaid += roundFuel;
+
+            let roundNetCash = roundCash - roundFuel;
+            if(isCompound) balance += roundNetCash;
+        }
+
+        let grossCashProfit = 0;
+        if(isCompound) {
+            grossCashProfit = balance - principal;
+        } else {
+            grossCashProfit = totalCashGross - totalFuelPaid;
+        }
+
+        let taxFee = grossCashProfit * taxRate;
+        let netCashProfit = grossCashProfit - taxFee;
+
+        $('res_net_cash').innerText = "¥ " + fmt(netCashProfit);
+        $('res_points').innerText = fmt(totalPoints);
+        $('bill_gross_cash').innerText = "+" + fmt(totalCashGross);
+        $('bill_gross_point').innerText = "+" + fmt(totalPoints);
+        $('bill_fuel').innerText = "-" + fmt(totalFuelPaid);
+        $('bill_tax').innerText = "-" + fmt(taxFee);
+        $('bill_total_net').innerText = "+" + fmt(netCashProfit + totalPoints);
+
+        // --- 4. 团队计算 ---
+        let directVol = parseFloat($('t_direct_vol').value) || 0;
+        let teamVol = parseFloat($('t_team_vol').value) || 0;
+        let peerIncome = parseFloat($('t_peer_income').value) || 0;
+
+        let directBonus = directVol * CONFIG.directRatio * rounds;
+        $('res_direct_award').innerText = "+" + fmt(directBonus);
+
+        let isInviteOk = invites >= 5;
+        let isVolOk = teamVol >= 100000;
+
+        if(isInviteOk) {
+            $('check_people').classList.add('ok');
+            $('check_people').querySelector('.dot').classList.add('ok');
+        } else {
+            $('check_people').classList.remove('ok');
+            $('check_people').querySelector('.dot').classList.remove('ok');
+        }
+        
+        if(isVolOk) {
+            $('check_vol').classList.add('ok');
+            $('check_vol').querySelector('.dot').classList.add('ok');
+        } else {
+            $('check_vol').classList.remove('ok');
+            $('check_vol').querySelector('.dot').classList.remove('ok');
+        }
+
+        let curLvl = LEVELS[0];
+        if (isInviteOk && isVolOk) {
+            for(let l of LEVELS) {
+                if(invites >= l.d) curLvl = l;
+            }
+        }
+
+        $('t_level_badge').innerText = curLvl.n;
+        $('t_level_badge').style.color = curLvl.n === 'V0' ? '#888' : '#bf5af2';
+        $('peer_box').style.display = curLvl.n >= 'V3' ? 'block' : 'none';
+
+        let teamBonus = teamVol * curLvl.r * rounds;
+        let peerBonus = (curLvl.n >= 'V3') ? (peerIncome * 0.1) : 0;
+        let totalTeamBonus = teamBonus + peerBonus;
+
+        $('res_team_award').innerText = "+" + fmt(totalTeamBonus);
+
+        // --- 5. 汇总 ---
+        let finalAsset = principal + netCashProfit + totalPoints + directBonus + totalTeamBonus;
+        let totalYield = finalAsset - principal;
+        let roi = principal > 0 ? ((totalYield / principal) * 100) : 0;
+
+        $('final_asset').innerText = "¥ " + fmt(finalAsset);
+        $('final_roi').innerText = "ROI: " + roi.toFixed(0) + "%";
+    }
+
+    // 初始化
+    calc();
+
+</script>
+</body>
+</html>
