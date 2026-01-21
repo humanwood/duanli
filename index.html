@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>盲盒收益计算器 V3.7</title>
+    <title>盲盒收益计算器 V3.8</title>
     <style>
         :root {
             --bg: #050505;
@@ -147,8 +147,8 @@
             </div>
             <input type="range" id="p_reward_rate" min="2.0" max="3.0" step="0.1" value="3.0" oninput="calc()">
             <div class="label-row" style="margin-top:5px;">
-                <span style="font-size:9px; color:#666;">*拆解: 70%现金 + 30%积分</span>
-                <span id="split_detail" style="font-size:9px; color:#888;">现金2.1% | 积分0.9%</span>
+                <span style="font-size:9px; color:#666;">*拆解: 70%金豆 + 30%银豆</span>
+                <span id="split_detail" style="font-size:9px; color:#888;">金豆2.1% | 银豆0.9%</span>
             </div>
         </div>
 
@@ -157,7 +157,7 @@
             <input type="range" id="p_time" min="1" max="12" value="6" step="1" oninput="calc()">
         </div>
         <div class="input-group" style="display:flex; justify-content:space-between; align-items:center; border-top:1px dashed #333; padding-top:10px;">
-            <span style="font-size:12px; color:#aaa;">开启复利 (现金利润滚入本金)</span>
+            <span style="font-size:12px; color:#aaa;">开启复利 (金豆利润滚入本金)</span>
             <input type="checkbox" id="p_compound" checked onchange="calc()" style="width:18px; height:18px;">
         </div>
     </div>
@@ -182,22 +182,22 @@
     <div class="income-grid">
         <div class="income-box">
             <div class="income-val val-cash" id="res_net_cash">0</div>
-            <div class="income-lbl">现金净利润 (税后)</div>
+            <div class="income-lbl">金豆净利润 (税后)</div>
         </div>
         <div class="income-box">
             <div class="income-val val-point" id="res_points">0</div>
-            <div class="income-lbl">购物积分价值 (0.9%)</div>
+            <div class="income-lbl">购物银豆价值 (0.9%)</div>
         </div>
     </div>
 
     <div class="card">
         <div class="card-head"><span class="card-title">🧾 收益构成明细</span></div>
         <div class="bill-row">
-            <span class="bill-key">💰 现金总产出 (本金×<span id="bill_rate_cash">2.1%</span>)</span>
+            <span class="bill-key">💰 金豆总产出</span>
             <span class="bill-val green" id="bill_gross_cash">+0</span>
         </div>
         <div class="bill-row">
-            <span class="bill-key">🎁 积分总产出 (本金×<span id="bill_rate_point">0.9%</span>)</span>
+            <span class="bill-key">🎁 银豆总产出</span>
             <span class="bill-val gold" id="bill_gross_point">+0</span>
         </div>
         <div class="bill-row">
@@ -205,7 +205,7 @@
             <span class="bill-val red" id="bill_fuel">-0</span>
         </div>
         <div class="bill-row">
-            <span class="bill-key">🏦 提现手续费 (仅扣现金部分)</span>
+            <span class="bill-key">🏦 提现手续费 (仅扣金豆部分)</span>
             <span class="bill-val red" id="bill_tax">-0</span>
         </div>
         <div class="bill-row" style="margin-top:5px; border-top:1px solid #333; padding-top:5px;">
@@ -280,7 +280,7 @@
 
 <div class="footer">
     <div class="foot-total">
-        <span>资产总价值 (现金+积分+团队)</span>
+        <span>资产总价值 (金豆+银豆+团队)</span>
         <b id="final_asset">¥ 0</b>
     </div>
     <div class="foot-roi" id="final_roi">ROI: 0%</div>
@@ -339,17 +339,14 @@
         let isCompound = $('p_compound').checked;
         let rounds = months * CONFIG.cycle;
 
-        // --- 新增：波比动态计算 ---
-        let totalRewardRate = parseFloat($('p_reward_rate').value) / 100; // e.g., 0.025
+        // --- 波比计算 ---
+        let totalRewardRate = parseFloat($('p_reward_rate').value) / 100;
         $('reward_rate_txt').innerText = (totalRewardRate * 100).toFixed(1) + "%";
         
         let cashRatio = totalRewardRate * 0.70;
         let pointRatio = totalRewardRate * 0.30;
         
-        // 更新UI上的拆解说明
-        $('split_detail').innerText = `现金${(cashRatio*100).toFixed(2)}% | 积分${(pointRatio*100).toFixed(2)}%`;
-        $('bill_rate_cash').innerText = (cashRatio*100).toFixed(2) + "%";
-        $('bill_rate_point').innerText = (pointRatio*100).toFixed(2) + "%";
+        $('split_detail').innerText = `金豆${(cashRatio*100).toFixed(2)}% | 银豆${(pointRatio*100).toFixed(2)}%`;
 
         // UI 文本更新
         $('p_time_txt').innerText = months + " 个月";
@@ -370,11 +367,11 @@
         $('fee_display').innerText = `费率: ${(taxRate*100).toFixed(0)}%`;
         $('fee_display').style.color = taxRate === 0.03 ? '#00f2ea' : '#fff';
 
-        // --- 3. 个人收益计算 (使用动态Ratio) ---
+        // --- 3. 个人收益计算 (严谨修正) ---
         let balance = principal;
-        let totalCashGross = 0;
-        let totalFuelPaid = 0;
-        let totalPoints = 0;
+        let totalCashGross = 0; // 金豆总产出
+        let totalFuelPaid = 0;  // 燃料费
+        let totalPoints = 0;    // 银豆总产出
 
         for(let i=0; i<rounds; i++) {
             let effectivePrincipal = 0;
@@ -386,8 +383,8 @@
 
             if (effectivePrincipal < CONFIG.minUnit) effectivePrincipal = 0;
 
-            let roundCash = effectivePrincipal * cashRatio;   // 动态
-            let roundPoint = effectivePrincipal * pointRatio; // 动态
+            let roundCash = effectivePrincipal * cashRatio;
+            let roundPoint = effectivePrincipal * pointRatio;
             let roundFuel = effectivePrincipal * CONFIG.fuelRatio;
 
             totalCashGross += roundCash;
@@ -398,15 +395,16 @@
             if(isCompound) balance += roundNetCash;
         }
 
-        let grossCashProfit = 0;
-        if(isCompound) {
-            grossCashProfit = balance - principal;
-        } else {
-            grossCashProfit = totalCashGross - totalFuelPaid;
-        }
-
-        let taxFee = grossCashProfit * taxRate;
-        let netCashProfit = grossCashProfit - taxFee;
+        // --- 修正后的税费逻辑：先算毛利税，再扣燃料 ---
+        // 逻辑：提现税费是基于"金豆收益总额"计算的，燃料费是另外的沉没成本。
+        // 计算金豆毛利（Compound模式下为增值部分+燃料消耗回填，Simple模式下即为总产出）
+        // 这里为了简化且准确：提现基础 = 金豆总产出。
+        // 注意：通常本金提现不收手续费（或规则另算），这里只算“收益”的手续费。
+        
+        let taxFee = totalCashGross * taxRate; // 针对金豆总产出收税
+        
+        // 净利润 = 金豆总产出 - 税费 - 燃料费
+        let netCashProfit = totalCashGross - taxFee - totalFuelPaid;
 
         $('res_net_cash').innerText = "¥ " + fmt(netCashProfit);
         $('res_points').innerText = fmt(totalPoints);
@@ -461,6 +459,7 @@
         $('res_team_award').innerText = "+" + fmt(totalTeamBonus);
 
         // --- 5. 汇总 ---
+        // 资产总价值 = 本金 + 金豆净利 + 银豆 + 团队
         let finalAsset = principal + netCashProfit + totalPoints + directBonus + totalTeamBonus;
         let totalYield = finalAsset - principal;
         let roi = principal > 0 ? ((totalYield / principal) * 100) : 0;
