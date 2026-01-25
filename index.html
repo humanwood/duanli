@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>盲盒收益计算器 V3.8</title>
+    <title>盲盒收益计算器 V3.9</title>
     <style>
         :root {
             --bg: #050505;
@@ -109,6 +109,10 @@
         .dot.ok { background: var(--primary); box-shadow: 0 0 5px var(--primary); }
         .status-item.ok { color: var(--primary); }
 
+        /* 错误提示文字 */
+        .error-msg { display: none; color: var(--fuel); font-size: 10px; margin-top: 6px; align-items: center; gap: 4px; animation: shake 0.3s; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+
         /* 底部汇总 */
         .footer { position: fixed; bottom: 0; left: 0; right: 0; background: #111; border-top: 1px solid #333; padding: 12px 20px; max-width: 600px; margin: 0 auto; z-index: 100; display: flex; justify-content: space-between; align-items: center; }
         .foot-total span { display: block; font-size: 10px; color: #666; }
@@ -119,8 +123,8 @@
 <body>
 
 <header>
-    <h1>盲盒收益计算器 V3.8</h1>
-    <p>波比灵活可调 · 适应市场变化</p>
+    <h1>盲盒收益计算器 V3.9</h1>
+    <p>波比灵活可调 · 智能数据校验</p>
 </header>
 
 <div class="tabs">
@@ -248,6 +252,9 @@
             <div class="input-wrap">
                 <input type="number" id="t_team_vol" value="0" placeholder="0" oninput="calc()">
             </div>
+            <div class="error-msg" id="team_vol_error">
+                ⚠️ 错误：团队流水不能小于直推流水，已自动修正计算
+            </div>
         </div>
 
         <div class="status-bar">
@@ -324,9 +331,13 @@
         let invites = parseInt($('invite').value) || 0;
         let avgInvest = parseFloat($('t_avg_invest').value) || 0;
         $('t_direct_vol').value = invites * avgInvest;
+        
         let teamVol = parseFloat($('t_team_vol').value) || 0;
-        if (teamVol < (invites * avgInvest)) {
-            $('t_team_vol').value = invites * avgInvest;
+        let minVol = invites * avgInvest;
+        
+        // 自动计算时，如果团队流水小于直推，自动补齐
+        if (teamVol < minVol) {
+            $('t_team_vol').value = minVol;
         }
         calc();
     }
@@ -367,11 +378,11 @@
         $('fee_display').innerText = `费率: ${(taxRate*100).toFixed(0)}%`;
         $('fee_display').style.color = taxRate === 0.03 ? '#00f2ea' : '#fff';
 
-        // --- 3. 个人收益计算 (严谨修正) ---
+        // --- 3. 个人收益计算 ---
         let balance = principal;
-        let totalCashGross = 0; // 金豆总产出
-        let totalFuelPaid = 0;  // 燃料费
-        let totalPoints = 0;    // 银豆总产出
+        let totalCashGross = 0; 
+        let totalFuelPaid = 0;  
+        let totalPoints = 0;    
 
         for(let i=0; i<rounds; i++) {
             let effectivePrincipal = 0;
@@ -395,15 +406,7 @@
             if(isCompound) balance += roundNetCash;
         }
 
-        // --- 修正后的税费逻辑：先算毛利税，再扣燃料 ---
-        // 逻辑：提现税费是基于"金豆收益总额"计算的，燃料费是另外的沉没成本。
-        // 计算金豆毛利（Compound模式下为增值部分+燃料消耗回填，Simple模式下即为总产出）
-        // 这里为了简化且准确：提现基础 = 金豆总产出。
-        // 注意：通常本金提现不收手续费（或规则另算），这里只算“收益”的手续费。
-        
         let taxFee = totalCashGross * taxRate; // 针对金豆总产出收税
-        
-        // 净利润 = 金豆总产出 - 税费 - 燃料费
         let netCashProfit = totalCashGross - taxFee - totalFuelPaid;
 
         $('res_net_cash').innerText = "¥ " + fmt(netCashProfit);
@@ -414,7 +417,7 @@
         $('bill_tax').innerText = "-" + fmt(taxFee);
         $('bill_total_net').innerText = "+" + fmt(netCashProfit + totalPoints);
 
-        // --- 4. 团队计算 ---
+        // --- 4. 团队计算 (核心验证逻辑) ---
         let directVol = parseFloat($('t_direct_vol').value) || 0;
         let teamVol = parseFloat($('t_team_vol').value) || 0;
         let peerIncome = parseFloat($('t_peer_income').value) || 0;
@@ -422,9 +425,26 @@
         let directBonus = directVol * CONFIG.directRatio * rounds;
         $('res_direct_award').innerText = "+" + fmt(directBonus);
 
+        // **验证逻辑开始**
+        // 如果输入的团队流水 < 直推流水
+        if(teamVol < directVol) {
+            // 显示错误提示
+            $('team_vol_error').style.display = 'flex';
+            $('t_team_vol').style.borderColor = 'var(--fuel)'; // 边框变红
+            
+            // 强制使用直推流水作为计算基数，防止逻辑错误
+            teamVol = directVol; 
+        } else {
+            // 隐藏错误提示
+            $('team_vol_error').style.display = 'none';
+            $('t_team_vol').style.borderColor = '#333'; // 恢复边框颜色
+        }
+        // **验证逻辑结束**
+
         let isInviteOk = invites >= 5;
         let isVolOk = teamVol >= 100000;
 
+        // V1门槛UI更新
         if(isInviteOk) {
             $('check_people').classList.add('ok');
             $('check_people').querySelector('.dot').classList.add('ok');
@@ -459,7 +479,6 @@
         $('res_team_award').innerText = "+" + fmt(totalTeamBonus);
 
         // --- 5. 汇总 ---
-        // 资产总价值 = 本金 + 金豆净利 + 银豆 + 团队
         let finalAsset = principal + netCashProfit + totalPoints + directBonus + totalTeamBonus;
         let totalYield = finalAsset - principal;
         let roi = principal > 0 ? ((totalYield / principal) * 100) : 0;
@@ -474,4 +493,3 @@
 </script>
 </body>
 </html>
-
