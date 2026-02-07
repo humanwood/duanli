@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>盲盒收益计算器 V3.9</title>
+    <title>盲盒收益计算器 V4.0</title>
     <style>
         :root {
             --bg: #050505;
@@ -146,7 +146,7 @@
         
         <div class="input-group">
             <div class="label-row">
-                <span>返利波比 (市场动态调整)</span> 
+                <span>返利波比 (市场动态调整)</span>
                 <span id="reward_rate_txt" style="color:var(--gold)">3.0%</span>
             </div>
             <input type="range" id="p_reward_rate" min="2.0" max="3.0" step="0.1" value="3.0" oninput="calc()">
@@ -240,7 +240,7 @@
         </div>
 
         <div class="input-group">
-            <div class="label-row"><span>直推总流水/轮 (自动计算)</span> <span>0.45% 奖励</span></div>
+            <div class="label-row"><span>直推总流水/轮 (自动计算)</span> <span>0.4% 奖励</span></div>
             <div class="input-wrap">
                 <input type="number" id="t_direct_vol" value="0" placeholder="0" oninput="calc()">
                 <span class="unit">元</span>
@@ -295,19 +295,19 @@
 
 <script>
     const CONFIG = {
-        cycle: 15,            
-        fuelRatio: 0.005,     
-        directRatio: 0.0045,
-        minUnit: 1000 
+        cycle: 15,
+        fuelRatio: 0.005,
+        directRatio: 0.004, // 直推改为 0.4%
+        minUnit: 1000
     };
 
     const LEVELS = [
         { n:'V0', r:0, d:0 },
         { n:'V1', r:0.0015, d:5 },
         { n:'V2', r:0.0030, d:6 },
-        { n:'V3', r:0.0045, d:7 },
-        { n:'V4', r:0.0055, d:8 },
-        { n:'V5', r:0.0065, d:9 }
+        { n:'V3', r:0.004, d:7 }, // V3 改为 0.4%
+        { n:'V4', r:0.005, d:8 }, // V4 改为 0.5%
+        { n:'V5', r:0.006, d:9 }  // V5 改为 0.6%
     ];
 
     const $ = id => document.getElementById(id);
@@ -323,7 +323,7 @@
     function syncInvite(val) {
         let v = parseInt(val);
         $('t_invite').value = v;
-        $('invite').value = v; 
+        $('invite').value = v;
         autoCalcVol();
     }
 
@@ -380,9 +380,9 @@
 
         // --- 3. 个人收益计算 ---
         let balance = principal;
-        let totalCashGross = 0; 
-        let totalFuelPaid = 0;  
-        let totalPoints = 0;    
+        let totalCashGross = 0;
+        let totalFuelPaid = 0;
+        let totalPoints = 0;
 
         for(let i=0; i<rounds; i++) {
             let effectivePrincipal = 0;
@@ -425,7 +425,7 @@
         let directBonus = directVol * CONFIG.directRatio * rounds;
         $('res_direct_award').innerText = "+" + fmt(directBonus);
 
-        // **验证逻辑开始**
+        // 验证逻辑开始
         // 如果输入的团队流水 < 直推流水
         if(teamVol < directVol) {
             // 显示错误提示
@@ -433,13 +433,13 @@
             $('t_team_vol').style.borderColor = 'var(--fuel)'; // 边框变红
             
             // 强制使用直推流水作为计算基数，防止逻辑错误
-            teamVol = directVol; 
+            teamVol = directVol;
         } else {
             // 隐藏错误提示
             $('team_vol_error').style.display = 'none';
             $('t_team_vol').style.borderColor = '#333'; // 恢复边框颜色
         }
-        // **验证逻辑结束**
+        // 验证逻辑结束
 
         let isInviteOk = invites >= 5;
         let isVolOk = teamVol >= 100000;
